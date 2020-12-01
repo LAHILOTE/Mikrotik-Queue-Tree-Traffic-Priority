@@ -1,0 +1,46 @@
+/ip firewall address-list
+add address=192.168.0.0/16 list=private_IPv4
+add address=172.16.0.0/12 list=private_IPv4
+add address=10.0.0.0/8 list=private_IPv4
+
+
+/ip firewall layer7-protocol
+add name=EXE regexp="\\x4d\\x5a(\\x90\\x03|\\x50\\x02)\\x04"
+add name=ZIP regexp="pk\\x03\\x04\\x14"
+add name=MP4 regexp="\\x18\\x66\\x74\\x79\\x70"
+add name=RAR regexp="Rar\\x21\\x1a\\x07"
+add name=youtube regexp="r[0-9]+---[a-z]+-+[a-z0-9-]+\\.googlevideo\\.com"
+
+
+/ip firewall mangle
+add action=accept chain=prerouting comment="Bypass Local Traffic" dst-address-list=private_IPv4 src-address-list=private_IPv4
+add action=accept chain=forward dst-address-list=private_IPv4 src-address-list=private_IPv4
+add action=mark-connection chain=forward comment="Games Traffic" dst-port=39190-39200 new-connection-mark=games passthrough=yes protocol=tcp src-address-list=private_IPv4
+add action=mark-connection chain=forward dst-port=40000-40010 new-connection-mark=games passthrough=yes protocol=udp src-address-list=private_IPv4
+add action=mark-packet chain=forward connection-mark=games in-interface="ether1 - Wan" new-packet-mark=games_down passthrough=no
+add action=mark-packet chain=forward connection-mark=games in-interface="ether2 - Lan" new-packet-mark=games_up passthrough=no
+add action=mark-connection chain=forward comment="ICMP Traffic" new-connection-mark=icmp passthrough=yes protocol=icmp src-address-list=private_IPv4
+add action=mark-packet chain=forward connection-mark=icmp in-interface="ether1 - Wan" new-packet-mark=icmp_down passthrough=no protocol=icmp
+add action=mark-packet chain=forward connection-mark=icmp in-interface="ether2 - Lan" new-packet-mark=icmp_up passthrough=no protocol=icmp
+add action=mark-connection chain=forward comment="DNS Traffic" dst-port=53 new-connection-mark=dns passthrough=yes protocol=udp src-address-list=private_IPv4
+add action=mark-packet chain=forward connection-mark=dns in-interface="ether1 - Wan" new-packet-mark=dns_down passthrough=no protocol=udp
+add action=mark-packet chain=forward connection-mark=dns in-interface="ether2 - Lan" new-packet-mark=dns_up passthrough=no protocol=udp
+add action=mark-connection chain=forward comment="Remote Traffic" dst-port=22,23,8291,5938,4899 new-connection-mark=remote passthrough=yes protocol=tcp src-address-list=private_IPv4
+add action=mark-packet chain=forward connection-mark=remote in-interface="ether1 - Wan" new-packet-mark=remote_down passthrough=no
+add action=mark-packet chain=forward connection-mark=remote in-interface="ether2 - Lan" new-packet-mark=remote_up passthrough=no
+add action=mark-connection chain=forward comment="YouTube Traffic" layer7-protocol=youtube new-connection-mark=youtube passthrough=yes src-address-list=private_IPv4
+add action=mark-packet chain=forward connection-mark=youtube in-interface="ether1 - Wan" new-packet-mark=youtube_down passthrough=no
+add action=mark-packet chain=forward connection-mark=youtube in-interface="ether2 - Lan" new-packet-mark=youtube_up passthrough=no
+add action=mark-connection chain=forward comment="Extension Layer7" layer7-protocol=EXE new-connection-mark=extensi passthrough=yes
+add action=mark-connection chain=forward layer7-protocol=ZIP new-connection-mark=extensi passthrough=yes
+add action=mark-connection chain=forward layer7-protocol=MP3 new-connection-mark=extensi passthrough=yes
+add action=mark-connection chain=forward layer7-protocol=RAR new-connection-mark=extensi passthrough=yes
+add action=mark-packet chain=forward connection-mark=extensi in-interface="ether1 - Wan" new-packet-mark=extensi_down passthrough=no
+add action=mark-packet chain=forward connection-mark=extensi in-interface="ether2 - Lan" new-packet-mark=extensi_up passthrough=no
+add action=mark-connection chain=forward comment="Browsing Traffic" connection-mark=!heavy_traffic new-connection-mark=browsing passthrough=yes src-address-list=private_IPv4
+add action=mark-connection chain=forward comment="Heavy Traffic" connection-bytes=1024000-0 connection-mark=browsing connection-rate=256k-102400k new-connection-mark=heavy_traffic passthrough=yes protocol=tcp
+add action=mark-connection chain=forward connection-bytes=1024000-0 connection-mark=browsing connection-rate=256k-102400k new-connection-mark=heavy_traffic passthrough=yes protocol=udp
+add action=mark-packet chain=forward connection-mark=heavy_traffic in-interface="ether1 - Wan" new-packet-mark=heavy_browsing_down passthrough=no
+add action=mark-packet chain=forward connection-mark=heavy_traffic in-interface="ether2 - Lan" new-packet-mark=heavy_browsing_up passthrough=no
+add action=mark-packet chain=forward connection-mark=browsing in-interface="ether1 - Wan" new-packet-mark=small_browsing_down passthrough=no
+add action=mark-packet chain=forward connection-mark=browsing in-interface="ether2 - Lan" new-packet-mark=small_browsing_up passthrough=no
